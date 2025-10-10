@@ -34,7 +34,7 @@ def add_user(user: User):
 def update_user(user_id: int, new_user: User):
     for i, u in enumerate(users):
         if u.user_id == user_id:
-            users[i] = new_user
+            users[i] == new_user
             return new_user
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
