@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=C:\Users\G00414637@atu.ie\OneDrive - Atlantic TU\CICD 2\CICD2_lab1\venv
+set VIRTUAL_ENV=C:\Users\G00414637@atu.ie\OneDrive - Atlantic TU\CICD 2\booking system\cicd-project\venv
 
 if not defined PROMPT set PROMPT=$P$G
 
