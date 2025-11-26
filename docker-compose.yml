@@ -1,28 +1,54 @@
+version: "3.9"
+
 services:
-  db:
+  # ---------- Databases ----------
+  user_db:
     image: postgres:17-alpine
-    env_file: .env.docker
-    volumes:
-      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: userdb
     ports:
-    - "5433:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U \"$${POSTGRES_USER:-app}\" -d \"$${POSTGRES_DB:-appdb}\""]
-      interval: 5s
-      retries: 10
+      - "5434:5432"
+    volumes:
+      - user_data:/var/lib/postgresql/data
     restart: unless-stopped
 
-  api:
-    build: .
-    env_file: .env.docker
+  course_db:
+    image: postgres:17-alpine
     environment:
-      - APP_ENV=docker
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: coursedb
+    ports:
+      - "5435:5432"
+    volumes:
+      - course_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # ---------- Microservices ----------
+  user_service:
+    build: ./user_service
+    env_file: ./user_service/.env.docker
+    environment:
+      APP_ENV: docker
     depends_on:
-      db:
-        condition: service_healthy
+      - user_db
     ports:
       - "8001:8000"
     restart: unless-stopped
 
+  course_service:
+    build: ./course_service
+    env_file: ./course_service/.env.docker
+    environment:
+      APP_ENV: docker
+    depends_on:
+      - course_db
+    ports:
+      - "8002:8000"
+    restart: unless-stopped
+
 volumes:
-  postgres-data: {}
+  user_data:
+  course_data:
