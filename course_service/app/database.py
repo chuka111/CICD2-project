@@ -12,7 +12,7 @@ envfile = {
 }.get(os.getenv("APP_ENV", "dev"), ".env.dev")
 load_dotenv(envfile, override=True)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./courses.db")
 SQL_ECHO = os.getenv("SQL_ECHO", "false").lower() == "true"
 RETRIES = int(os.getenv("DB_RETRIES", "10"))
 DELAY = float(os.getenv("DB_RETRY_DELAY", "1.5"))
