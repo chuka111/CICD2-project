@@ -1,15 +1,16 @@
+import httpx, os
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-
-
 from .database import engine, get_db
 from .models import Base, CourseDB
 from .schemas import CourseCreate, CourseRead
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
+
+BOOKING_SERVICE_BASE = os.getenv("BOOKING_SERVICE_BASE", "http://booking_service:8000")
 
 def commit_or_rollback(db: Session, error_msg: str):
     try:
@@ -47,3 +48,15 @@ def get_course(course_id: int, db: Session = Depends(get_db)):
     if not course:
         raise HTTPException(status_code=404, detail="Course not found")
     return course
+
+@app.get("/api/courses/{course_id}/bookings")
+def get_course_bookings(course_id: int):
+    url = f"{BOOKING_SERVICE_BASE}/api/bookings?course_id={course_id}"
+
+    with httpx.Client(timeout=5.0) as client:
+        r = client.get(url)
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=502, detail="Booking Service error")
+
+    return r.json()
