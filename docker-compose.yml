@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # ---------- Databases ----------
   user_db:
@@ -12,7 +10,8 @@ services:
       - "5434:5432"
     volumes:
       - user_data:/var/lib/postgresql/data
-    restart: unless-stopped
+    networks:
+      - appnet
 
   course_db:
     image: postgres:17-alpine
@@ -24,7 +23,21 @@ services:
       - "5435:5432"
     volumes:
       - course_data:/var/lib/postgresql/data
-    restart: unless-stopped
+    networks:
+      - appnet
+
+  booking_db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: bookingdb
+    ports:
+      - "5436:5432"
+    volumes:
+      - booking_data:/var/lib/postgresql/data
+    networks:
+      - appnet
 
   # ---------- Microservices ----------
   user_service:
@@ -36,7 +49,8 @@ services:
       - user_db
     ports:
       - "8001:8000"
-    restart: unless-stopped
+    networks:
+      - appnet
 
   course_service:
     build: ./course_service
@@ -47,8 +61,27 @@ services:
       - course_db
     ports:
       - "8002:8000"
-    restart: unless-stopped
+    networks:
+      - appnet
+
+  booking_service:
+    build: ./booking_service
+    env_file: ./booking_service/.env.docker
+    environment:
+      APP_ENV: docker
+    depends_on:
+      - booking_db
+      - user_service
+      - course_service
+    ports:
+      - "8003:8000"
+    networks:
+      - appnet
+
+networks:
+  appnet:
 
 volumes:
   user_data:
   course_data:
+  booking_data:

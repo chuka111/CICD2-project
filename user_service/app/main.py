@@ -1,3 +1,4 @@
+import httpx, os
 from fastapi import FastAPI, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -9,6 +10,9 @@ from .schemas import UserCreate, UserRead
 
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
+
+BOOKING_SERVICE_BASE = os.getenv("BOOKING_SERVICE_BASE", "http://booking_service:8000")
+
 
 def commit_or_rollback(db: Session, error_msg: str):
     try:
@@ -55,7 +59,7 @@ def list_users(db: Session = Depends(get_db)):
     return rows
 
 
-# DELETE → cascades deletes bookings for that user
+# DELETE  cascades deletes bookings for that user
 @app.delete("/api/users/{user_id}", status_code=204)
 def delete_user(user_id: int, db: Session = Depends(get_db)):
     user = db.get(UserDB, user_id)
@@ -65,3 +69,15 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.delete(user)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+@app.get("/api/users/{user_id}/bookings")
+def get_user_bookings(user_id: int):
+    url = f"{BOOKING_SERVICE_BASE}/api/bookings?user_id={user_id}"
+
+    with httpx.Client(timeout=5.0) as client:
+        r = client.get(url)
+
+    if r.status_code >= 400:
+        raise HTTPException(status_code=502, detail="Booking Service error")
+
+    return r.json()
