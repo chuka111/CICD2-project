@@ -1,3 +1,6 @@
+import aio_pika
+import asyncio
+import json
 import httpx, os
 import time
 from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks
@@ -16,6 +19,11 @@ Base.metadata.create_all(bind=engine)
 # ---------- Service URLs ----------
 USER_SERVICE_BASE = os.getenv("USER_SERVICE_BASE", "http://user_service:8000")
 COURSE_SERVICE_BASE = os.getenv("COURSE_SERVICE_BASE", "http://course_service:8000")
+
+# ---------- RabbitMQ ----------
+RABBIT_URL = os.getenv("RABBIT_URL")
+BOOKING_QUEUE = os.getenv("BOOKING_QUEUE", "bookings_queue")
+
 
 
 # ---------- Circuit Breaker ----------
@@ -50,7 +58,7 @@ class CircuitBreaker:
 course_cb = CircuitBreaker()
 
 
-# ---------- Helper= functions ----------
+# ---------- Helper functions ----------
 def fetch_user(user_id):
     url = f"{USER_SERVICE_BASE}/api/users/{user_id}"
 
@@ -71,10 +79,7 @@ def fetch_user(user_id):
 
 def fetch_course(course_id):
     if course_cb.is_open():
-        raise HTTPException(
-            status_code=503,
-            detail="Course Service unavailable"
-        )
+        raise HTTPException(status_code=503, detail="Course Service unavailable")
 
     url = f"{COURSE_SERVICE_BASE}/api/courses/{course_id}"
 
@@ -96,6 +101,39 @@ def fetch_course(course_id):
     course_cb.record_success()
     return r.json()
 
+
+# ---------- RabbitMQ publisher ----------
+async def publish_booking(payload):
+    connection = await aio_pika.connect_robust(RABBIT_URL)
+    channel = await connection.channel()
+
+    message = aio_pika.Message(
+        body=json.dumps(payload).encode("utf-8")
+    )
+
+    await channel.default_exchange.publish(
+        message,
+        routing_key=BOOKING_QUEUE
+    )
+
+    await connection.close()
+
+
+def notify_booking_confirmed(booking_id, user_id, course_id):
+    if not RABBIT_URL:
+        return
+
+    payload = {
+        "booking_id": booking_id,
+        "user_id": user_id,
+        "course_id": course_id,
+        "status": "confirmed"
+    }
+
+    try:
+        asyncio.run(publish_booking(payload))
+    except Exception:
+        return
 
 
 # ---------- Bookings ----------
