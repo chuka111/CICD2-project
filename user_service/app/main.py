@@ -1,19 +1,24 @@
 import os
 import time
 import httpx
+
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+
 from passlib.context import CryptContext
 from jose import jwt
+
 from .database import engine, get_db
 from .models import Base, UserDB
-from .schemas import (UserRead, UserRegister, UserLogin, TokenRead)
+from .schemas import UserRead, UserRegister, UserLogin, TokenRead
+
 
 app = FastAPI(title="User Service")
 Base.metadata.create_all(bind=engine)
+
 
 BOOKING_SERVICE_BASE = os.getenv("BOOKING_SERVICE_BASE", "http://booking_service:8000")
 
@@ -32,13 +37,13 @@ def commit_or_rollback(db: Session, error_msg: str):
         raise HTTPException(status_code=409, detail=error_msg)
 
 
-def make_token(user_id: int, username: str):
+def make_token(user_id, email):
     now = int(time.time())
     payload = {
         "sub": str(user_id),
-        "username": username,
+        "email": email,
         "iat": now,
-        "exp": now + (JWT_EXPIRE_MINUTES * 60)
+        "exp": now + (JWT_EXPIRE_MINUTES * 60),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALG)
 
@@ -54,20 +59,14 @@ def register(payload: UserRegister, db: Session = Depends(get_db)):
     existing_email = db.execute(
         select(UserDB).where(UserDB.email == payload.email)
     ).scalar_one_or_none()
+
     if existing_email:
         raise HTTPException(status_code=409, detail="Email already in use")
-
-    existing_username = db.execute(
-        select(UserDB).where(UserDB.username == payload.username)
-    ).scalar_one_or_none()
-    if existing_username:
-        raise HTTPException(status_code=409, detail="Username already in use")
 
     user = UserDB(
         name=payload.name,
         email=payload.email,
-        username=payload.username,
-        password_hash=pwd_context.hash(payload.password)
+        password_hash=pwd_context.hash(payload.password),
     )
 
     db.add(user)
@@ -75,44 +74,24 @@ def register(payload: UserRegister, db: Session = Depends(get_db)):
     db.refresh(user)
     return user
 
+
 @app.post("/api/auth/login", response_model=TokenRead)
 def login(payload: UserLogin, db: Session = Depends(get_db)):
     user = db.execute(
-        select(UserDB).where(UserDB.username == payload.username)
+        select(UserDB).where(UserDB.email == payload.email)
     ).scalar_one_or_none()
 
     if not user:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
     if not pwd_context.verify(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid username or password")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    token = make_token(user.id, user.username)
+    token = make_token(user.id, user.email)
     return {"access_token": token, "token_type": "bearer"}
 
 
 # ---------- Users ----------
-@app.post("/api/users", response_model=UserRead, status_code=201)
-def create_user(payload: UserRead, db: Session = Depends(get_db)):
-    exists = db.execute(
-        select(UserDB).where(UserDB.email == payload.email)
-    ).scalar_one_or_none()
-    if exists:
-        raise HTTPException(status_code=409, detail="User already exists")
-
-    user = UserDB(**payload.model_dump())
-    db.add(user)
-
-    try:
-        db.commit()
-        db.refresh(user)
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="User already exists")
-
-    return user
-
-
 @app.get("/api/users/{user_id}", response_model=UserRead)
 def get_user(user_id: int, db: Session = Depends(get_db)):
     user = db.get(UserDB, user_id)
