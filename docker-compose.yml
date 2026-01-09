@@ -78,6 +78,16 @@ services:
     networks:
       - appnet
 
+  notification_service:
+    build: ./notification_service
+    env_file: ./notification_service/.env.docker
+    environment:
+      APP_ENV: docker
+    ports:
+      - "8004:8000"
+    networks:
+      - appnet
+
 networks:
   appnet:
 
