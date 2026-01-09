@@ -7,19 +7,17 @@ from pydantic import BaseModel, EmailStr, ConfigDict, StringConstraints
 # ---------- Reusable type aliases ----------
 NameStr = Annotated[str, StringConstraints(min_length=1, max_length=100)]
 AgeInt = Annotated[int, Ge(18), Le(120)]
-UsernameStr = Annotated[str, StringConstraints(min_length=3, max_length=50)]
-PasswordStr = Annotated[str, StringConstraints(min_length=6, max_length=255)]
+PasswordStr = Annotated[str, StringConstraints(min_length=6, max_length=72)]
 
 # ---------- Users ----------
 
 class UserRegister(BaseModel):
     name: NameStr
     email: EmailStr
-    username: UsernameStr
     password: PasswordStr
 
 class UserLogin(BaseModel):
-    username: UsernameStr
+    email: EmailStr
     password: PasswordStr
 
 class TokenRead(BaseModel):
@@ -31,5 +29,4 @@ class UserRead(BaseModel):
     id: int
     name: NameStr
     email: EmailStr
-    username: UsernameStr
 
